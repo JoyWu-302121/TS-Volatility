@@ -35,8 +35,6 @@ The models are evaluated using statistical diagnostics such as AIC/BIC, residual
 
 - `Final_Short_Model.ipynb`  
   Focuses on a shorter, more recent time period to better capture current market conditions. Used for model refinement, forecasting, and comparison with the long-horizon model.
-- `Mean_Model.ipynb`  
-  Implements mean modeling of returns using ARIMA models. Includes model selection using AIC/BIC, parameter estimation, and diagnostic testing (e.g., residual analysis and Ljung–Box tests) to confirm that residuals behave like white noise.
 
 - `Volatility_Model.ipynb`  
   Models time-varying volatility using GARCH-type models on the residuals from the mean model. Generates volatility forecasts and evaluates model performance, with applications to risk measurement and volatility-based trading strategies.
