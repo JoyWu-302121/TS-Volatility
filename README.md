@@ -18,9 +18,6 @@ The models are evaluated using statistical diagnostics such as AIC/BIC, residual
 - `Literature_Review/`  
   Contains background research and references on time-series modeling, volatility, and GARCH-type models that inform the methodology used in this project.
 
-- `10yr_Model.ipynb`  
-  Implements time-series modeling on a longer historical dataset (~10 years). Includes mean model estimation (ARIMA), diagnostic testing, and volatility modeling to capture long-term dynamics.
-
 - `Final_Short_Model.ipynb`  
   Focuses on a shorter, more recent time period to better capture current market conditions. Used for model refinement, forecasting, and comparison with the long-horizon model.
 
