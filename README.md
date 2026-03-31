@@ -10,8 +10,40 @@ The models are evaluated using statistical diagnostics such as AIC/BIC, residual
 ## Project Structure
 
 - `data/`  
-  Contains the raw and processed datasets used throughout the project, including SPX/SPY price data and any cleaned return series used for modeling.
+ Contains the raw and processed datasets used throughout the project, including SPX/SPY price data and any cleaned return series used for modeling.
 
+## Data
+  Contains the raw and processed datasets used throughout the project, including original price data, cleaned return series, training and test datasets, intraday volatility data for reference, and options data containing implied volatility.
+
+# `data/raw/`
+Contains the original source files before cleaning or transformation.
+
+- `SP_Index_500.csv`  
+  Raw historical S&P 500 price data used as the starting point for the time-series analysis.
+
+- `Intraday_vol.xlsx`  
+  Raw intraday volatility data used for informational purposes. This file provides additional context on intraday market volatility, but it is not the main input for the core ARIMA and GARCH modeling workflow.
+
+# `data/processed/`
+Contains cleaned and model-ready datasets used throughout the project.
+
+- `SPY_Close.csv`  
+  Cleaned daily SPY closing price data used to construct returns and support the time-series modeling process.
+
+- `SPY_log_return.csv`  
+  Daily log returns computed from SPY closing prices. This is the main return series used for mean and volatility modeling.
+
+- `SPY_Close_modeling_2.5y.csv`  
+  Training dataset covering the 2.5-year modeling sample. This file is used to fit the time-series models.
+
+- `SPY_Close_forecast_0.5y.csv`  
+  Test dataset covering the 0.5-year out-of-sample period. This file is used to evaluate forecast performance.
+
+- `SPX_Intraday_Vol.csv`  
+  Processed intraday volatility dataset included for informational purposes. It provides additional insight into volatility behavior within the trading day, rather than serving as a primary input to the core models.
+
+- `options_data_2025.xlsx`  
+  Processed options dataset containing implied volatility data. This file is used to compare model-based volatility forecasts with market-implied volatility.
 - `code/`  
   Includes supporting scripts and functions used for data processing, model estimation, and analysis.
 
