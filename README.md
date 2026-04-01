@@ -12,6 +12,14 @@ The models are evaluated using statistical diagnostics such as AIC/BIC, residual
 - `data/`  
  Contains the raw and processed datasets used throughout the project, including SPX/SPY price data and any cleaned return series used for modeling.
 
+- `Literature_Review/`  
+  Contains background research and references on time-series modeling, volatility, and GARCH-type models that inform the methodology used in this project.
+
+- `README.md`  
+  Provides an overview of the project, methodology, and repository structure.
+  
+- `code/`
+  Includes supporting scripts and functions used for data processing, model estimation, and analysis.
 ## Data
   Contains the raw and processed datasets used throughout the project, including original price data, cleaned return series, training and test datasets, intraday volatility data for reference, and options data containing implied volatility.
 
@@ -50,20 +58,23 @@ Contains cleaned and model-ready datasets used throughout the project.
 - `Literature_Review/`  
   Contains background research and references on time-series modeling, volatility, and GARCH-type models that inform the methodology used in this project.
 
-- `Final_Short_Model.ipynb`  
-  Focuses on a shorter, more recent time period to better capture current market conditions. Used for model refinement, forecasting, and comparison with the long-horizon model.
-
 - `README.md`  
   Provides an overview of the project, methodology, and repository structure.
 
+## Code  
+  Includes supporting scripts and functions used for data processing, model estimation, and analysis.
+  
 - `EDA_SPY.ipynb`  
   Performs exploratory data analysis on SPY price and return data. This includes computing log returns, visualizing return distributions, and analyzing autocorrelation and volatility clustering to motivate time-series modeling.
 
-- `10yr_Model.ipynb`  
-  Implements time-series modeling on a longer historical dataset (~10 years). Includes mean model estimation (ARIMA), diagnostic testing, and volatility modeling to capture long-term dynamics.
-
-- `Final_Short_Model.ipynb`  
+- Mean_Model.ipynb`  
   Focuses on a shorter, more recent time period to better capture current market conditions. Used for model refinement, forecasting, and comparison with the long-horizon model.
 
 - `Volatility_Model.ipynb`  
   Models time-varying volatility using GARCH-type models on the residuals from the mean model. Generates volatility forecasts and evaluates model performance, with applications to risk measurement and volatility-based trading strategies.
+
+  - `intra_vol_process.ipynb`  
+  Processes high-frequency intraday data to construct intraday volatility measures used for analysis and modeling.
+
+- `Intraday_Volatility_Model.ipynb`  
+  Implements a model to analyze and forecast intraday volatility dynamics using the processed high-frequency data.
