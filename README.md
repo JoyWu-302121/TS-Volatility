@@ -67,7 +67,7 @@ Contains cleaned and model-ready datasets used throughout the project.
 - `EDA_SPY.ipynb`  
   Performs exploratory data analysis on SPY price and return data. This includes computing log returns, visualizing return distributions, and analyzing autocorrelation and volatility clustering to motivate time-series modeling.
 
-- Mean_Model.ipynb`  
+- `Mean_Model.ipynb`  
   Focuses on a shorter, more recent time period to better capture current market conditions. Used for model refinement, forecasting, and comparison with the long-horizon model.
 
 - `Volatility_Model.ipynb`  
