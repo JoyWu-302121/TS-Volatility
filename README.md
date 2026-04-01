@@ -9,14 +9,14 @@ The models are evaluated using statistical diagnostics such as AIC/BIC, residual
 
 ## Project Structure
 
-- `data/`  
- Contains the raw and processed datasets used throughout the project, including SPX/SPY price data and any cleaned return series used for modeling.
+- `README.md`  
+  Provides an overview of the project, methodology, and repository structure.
 
 - `Literature_Review/`  
   Contains background research and references on time-series modeling, volatility, and GARCH-type models that inform the methodology used in this project.
 
-- `README.md`  
-  Provides an overview of the project, methodology, and repository structure.
+- `data/`  
+ Contains the raw and processed datasets used throughout the project, including SPX/SPY price data and any cleaned return series used for modeling.
   
 - `code/`
   Includes supporting scripts and functions used for data processing, model estimation, and analysis.
@@ -73,7 +73,7 @@ Contains cleaned and model-ready datasets used throughout the project.
 - `Volatility_Model.ipynb`  
   Models time-varying volatility using GARCH-type models on the residuals from the mean model. Generates volatility forecasts and evaluates model performance, with applications to risk measurement and volatility-based trading strategies.
 
-  - `intra_vol_process.ipynb`  
+- `intra_vol_process.ipynb`  
   Processes high-frequency intraday data to construct intraday volatility measures used for analysis and modeling.
 
 - `Intraday_Volatility_Model.ipynb`  
