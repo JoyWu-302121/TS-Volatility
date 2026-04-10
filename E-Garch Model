@@ -2,7 +2,7 @@ import pandas as pd
 pd.read_csv('SPY_Close_modeling_2.5y.csv')
 pd.read_csv('SPY_Close_forecast_0.5y.csv')
 !pip install arch
-
+### Oneday Conditonal Volatility
 
 import numpy as np
 import pandas as pd
