@@ -1,363 +1,14 @@
 import pandas as pd
-pd.read_csv('SPY_Close_modeling_2.5y.csv')
-pd.read_csv('SPY_Close_forecast_0.5y.csv')
-
-
-import numpy as np
-
-# ── 1. LOAD & COMBINE ──────────────────────────────────────────────────────────
-df_25 = pd.read_csv('SPY_Close_modeling_2.5y.csv')
-df_05 = pd.read_csv('SPY_Close_forecast_0.5y.csv')
-
-df = pd.concat([df_25, df_05], axis=0).reset_index(drop=True)
-
-# ── 2. CLEAN & SORT ────────────────────────────────────────────────────────────
-df['Date'] = pd.to_datetime(df['Date'])
-df = df.sort_values('Date').reset_index(drop=True)
-
-# ── 3. EWMA VOLATILITY FUNCTION ────────────────────────────────────────────────
-def get_ewma_forecast(df: pd.DataFrame, col_name: str, span: int = 30) -> pd.Series:
-    """
-    Calculates annualized EWMA volatility forecast.
-
-    Parameters:
-        df       : DataFrame containing the return column
-        col_name : Column name of log returns
-        span     : EWMA span (controls lambda decay). Default = 30
-                   Lambda = 1 - (2 / (span + 1))
-
-    Returns:
-        pd.Series of 30-day rolling average annualized volatility
-    """
-    TRADING_DAYS = 252
-    ROLLING_WINDOW = 30
-
-    # Squared log returns
-    sq_returns = df[col_name] ** 2
-
-    # EWMA variance → daily volatility
-    daily_vol = np.sqrt(sq_returns.ewm(span=span, adjust=False).mean())
-
-    # Annualize
-    annual_vol = daily_vol * np.sqrt(TRADING_DAYS)
-
-    # Smooth with rolling average
-    forecast = annual_vol.rolling(window=ROLLING_WINDOW).mean()
-
-    return forecast
-
-# ── 4. RUN MODEL ───────────────────────────────────────────────────────────────
-df['forecast_vol'] = get_ewma_forecast(df, col_name='log_return', span=30)
-
-# Derived lambda for reference
-span = 30
-lam = 1 - (2 / (span + 1))
-print(f"EWMA Lambda (λ): {lam:.4f}")
-
-# ── 5. PRINT RESULTS ───────────────────────────────────────────────────────────
-print("\n── EWMA VOLATILITY FORECAST (Continuous Model, 30-Day Rolling Avg) ──")
-
-print("\n[ Transition Period — June 2025 ]")
-june_mask = df['Date'].dt.month == 6
-print(df[june_mask].tail(5)[['Date', 'close', 'forecast_vol']].to_string(index=False))
-
-print("\n[ Final Period — December 2025 ]")
-print(df.tail(10)[['Date', 'close', 'forecast_vol']].to_string(index=False))
-
-df = pd.read_excel('options_data_2025.xlsx')
-
-import pandas as pd
-import numpy as np
-
-# ── 1. LOAD DATA ───────────────────────────────────────────────────────────────
-df_25 = pd.read_csv('SPY_Close_modeling_2.5y.csv')
-df_05 = pd.read_csv('SPY_Close_forecast_0.5y.csv')
-
-# Load the IV sheet directly from your Excel file
-iv_df = pd.read_excel('options_data_2025.xlsx', sheet_name='IV')
-
-# ── 2. CHECK IV SHEET ──────────────────────────────────────────────────────────
-print("IV columns:", iv_df.columns.tolist())
-print("IV shape:", iv_df.shape)
-print(iv_df.head(3))
-
-# ── 3. COMBINE & SORT PRICE DATA ───────────────────────────────────────────────
-df = pd.concat([df_25, df_05], axis=0).reset_index(drop=True)
-df['Date'] = pd.to_datetime(df['Date'])
-df = df.sort_values('Date').reset_index(drop=True)
-
-# ── 4. FORMAT IV DATE ──────────────────────────────────────────────────────────
-iv_df['Date'] = pd.to_datetime(iv_df['Date'])
-
-# ── 5. EWMA FUNCTION ───────────────────────────────────────────────────────────
-def get_ewma_forecast(df: pd.DataFrame, col_name: str, span: int = 30) -> pd.Series:
-    """
-    Calculates annualized EWMA volatility forecast.
-
-    Parameters:
-        df       : DataFrame containing the return column
-        col_name : Column name of log returns
-        span     : EWMA span (controls lambda decay). Default = 30
-
-    Returns:
-        pd.Series of 30-day rolling average annualized volatility
-    """
-    TRADING_DAYS = 252
-    ROLLING_WINDOW = 30
-
-    sq_returns = df[col_name] ** 2
-    daily_vol = np.sqrt(sq_returns.ewm(span=span, adjust=False).mean())
-    annual_vol = daily_vol * np.sqrt(TRADING_DAYS)
-    forecast = annual_vol.rolling(window=ROLLING_WINDOW).mean()
-    return forecast
-
-# ── 6. RUN EWMA ────────────────────────────────────────────────────────────────
-df['forecast_vol'] = get_ewma_forecast(df, col_name='log_return', span=30)
-
-# Verify forecast_vol exists before merging
-print("\n✓ df columns:", df.columns.tolist())
-print("✓ forecast_vol sample:\n", df['forecast_vol'].tail(3))
-
-# ── 7. MERGE EWMA WITH IV DATA ─────────────────────────────────────────────────
-merged_df = pd.merge(
-    iv_df,
-    df[['Date', 'forecast_vol']],
-    on='Date',
-    how='inner'
-)
-
-print(f"\n✓ Merged rows: {len(merged_df)}")
-print("✓ Merged columns:", merged_df.columns.tolist())
-
-# ── 8. DEFINE IV COLUMN ────────────────────────────────────────────────────────
-# Update this to match your exact IV column name from the IV sheet
-IV_COL = 'IV_30D=(B2+C2)/2'
-
-# ── 9. CALCULATE VOLATILITY SPREAD ────────────────────────────────────────────
-# Divides IV by 100 to convert percentage to decimal (e.g. 15.5 → 0.155)
-merged_df['vol_spread'] = (merged_df[IV_COL]) - merged_df['forecast_vol']
-
-# ── 10. CLASSIFY SPREAD ────────────────────────────────────────────────────────
-def classify_spread(spread: float) -> str:
-    if spread > 0.0279:
-        return 'IV Rich'
-    elif spread < -0.0237:
-        return 'IV Cheap'
-    else:
-        return 'Neutral'
-
-merged_df['signal'] = merged_df['vol_spread'].apply(classify_spread)
-
-# ── 11. PRINT RESULTS ──────────────────────────────────────────────────────────
-print("\n── VOLATILITY SPREAD (Market IV vs. EWMA Forecast) ──")
-cols_to_show = ['Date', IV_COL, 'forecast_vol', 'vol_spread', 'signal']
-print(merged_df[cols_to_show].tail(10).to_string(index=False))
-
-# ── 12. SUMMARY STATS ─────────────────────────────────────────────────────────
-print("\n── SPREAD SUMMARY STATS ──")
-print(f"  Mean Spread : {merged_df['vol_spread'].mean():.4f}")
-print(f"  Max Spread  : {merged_df['vol_spread'].max():.4f}")
-print(f"  Min Spread  : {merged_df['vol_spread'].min():.4f}")
-print(f"  Std Dev     : {merged_df['vol_spread'].std():.4f}")
-
-print("\n── SIGNAL COUNTS ──")
-print(merged_df['signal'].value_counts().to_string())
-
-
-# ── FIX SPREAD CALCULATION ─────────────────────────────────────────────────────
-merged_df['vol_spread'] = merged_df[IV_COL] - merged_df['forecast_vol']
-
-# ── CHECK NEW DISTRIBUTION ─────────────────────────────────────────────────────
-print(merged_df['vol_spread'].describe())
-
-# ── APPLY CORRECT THRESHOLDS ───────────────────────────────────────────────────
-lower = merged_df['vol_spread'].quantile(0.25)
-upper = merged_df['vol_spread'].quantile(0.75)
-
-print(f"\nSuggested lower threshold : {lower:.4f}")
-print(f"Suggested upper threshold : {upper:.4f}")
-
-# ── GENERATE SIGNALS ───────────────────────────────────────────────────────────
-merged_df['signal'] = 'Neutral'
-merged_df.loc[merged_df['vol_spread'] > upper, 'signal'] = 'Sell Straddle'
-merged_df.loc[merged_df['vol_spread'] < lower, 'signal'] = 'Buy Straddle'
-
-# ── PRINT RESULTS ──────────────────────────────────────────────────────────────
-print("\n── VOLATILITY SPREAD (Fixed) ──")
-print(merged_df[['Date', IV_COL, 'forecast_vol', 'vol_spread', 'signal']].tail(10).to_string(index=False))
-
-print("\n── SIGNAL COUNTS ──")
-print(merged_df['signal'].value_counts().to_string())
-
-
-# Load your actual straddle prices
-straddle_df = pd.read_excel('options_data_2025.xlsx', sheet_name='Straddle')
-
-# Check what columns you have
-print("Straddle columns:", straddle_df.columns.tolist())
-print(straddle_df.head(5))
-
-
-ION_COST = 0.001   # 0.1% per trade
-TRANSACTION_COST = ION_COST  # Fixing the variable name from ION_COST to TRANSACTION_COST
-
-backtest_df['strategy_pnl'] = 0.0
-
-for i in range(len(backtest_df)):
-    signal    = backtest_df.loc[i, 'signal']
-    straddle  = backtest_df.loc[i, STRADDLE_COL]
-    daily_pnl = backtest_df.loc[i, 'PnL']
-
-    if signal == 'Sell Straddle':
-        # Short the straddle — profit when price drops
-        backtest_df.loc[i, 'strategy_pnl'] = -daily_pnl - (straddle * TRANSACTION_COST)
-
-    elif signal == 'Buy Straddle':
-        # Long the straddle — profit when price rises
-        backtest_df.loc[i, 'strategy_pnl'] = daily_pnl - (straddle * TRANSACTION_COST)
-
-# ── 4. CUMULATIVE P&L ─────────────────────────────────────────────────────────
-backtest_df['cumulative_pnl'] = backtest_df['strategy_pnl'].cumsum()
-
-# ── 5. PERFORMANCE METRICS ────────────────────────────────────────────────────
-trades_df = backtest_df[backtest_df['signal'] != 'Neutral']
-wins      = trades_df[trades_df['strategy_pnl'] > 0].shape[0]
-total     = trades_df.shape[0]
-win_rate  = wins / total if total > 0 else 0
-
-sharpe = (
-    backtest_df['strategy_pnl'].mean() /
-    backtest_df['strategy_pnl'].std() *
-    np.sqrt(252)
-)
-
-max_drawdown = (
-    backtest_df['cumulative_pnl'] -
-    backtest_df['cumulative_pnl'].cummax()
-).min()
-
-# ── 6. PRINT RESULTS ──────────────────────────────────────────────────────────
-print("\n── REAL BACKTEST RESULTS ──")
-cols = ['Date', 'signal', STRADDLE_COL, 'strategy_pnl', 'cumulative_pnl']
-print(backtest_df[cols].tail(10).to_string(index=False))
-
-print("\n── PERFORMANCE METRICS ──")
-print(f"  Total Trades     : {total}")
-print(f"  Win Rate         : {win_rate:.1%}")
-print(f"  Sharpe Ratio     : {sharpe:.2f}")
-print(f"  Max Drawdown     : ${max_drawdown:.2f}")
-print(f"  Final Cum. P&L   : ${backtest_df['cumulative_pnl'].iloc[-1]:.2f}")
-
-print("\n── SIGNAL BREAKDOWN ──")
-signal_pnl = backtest_df.groupby('signal')['strategy_pnl'].agg(['sum', 'mean', 'count'])
-signal_pnl.columns = ['Total PnL', 'Avg PnL', 'Count']
-print(signal_pnl.to_string())
-
-
-import pandas as pd
-import numpy as np
-
-# 1. SETTINGS
-THRESHOLD = 0.02  # 2% difference
-CYCLE_LENGTH = 5  # 5-day cycle
-
-# 2. CREATE THE 5-DAY TRADING CYCLE
-# Using np.arange creates a list of numbers from 0 to the end of the data
-# We use % (modulo) to wrap the numbers back to 0 every 5 days, then add 1
-merged_df['cycle_day'] = (np.arange(len(merged_df)) % CYCLE_LENGTH) + 1
-
-# 3. GENERATE SIGNALS (Vectorized Approach)
-# We start by setting every row to 'HOLD/NONE'
-merged_df['entry_signal'] = 'HOLD/NONE'
-
-# We create a "mask" to identify only the rows that are Day 1
-day_1_mask = (merged_df['cycle_day'] == 1)
-
-# Logic for SHORT_STRADDLE (Spread is higher than threshold)
-merged_df.loc[day_1_mask & (merged_df['vol_spread'] > THRESHOLD), 'entry_signal'] = 'SHORT_STRADDLE'
-
-# Logic for LONG_STRADDLE (Spread is lower than negative threshold)
-merged_df.loc[day_1_mask & (merged_df['vol_spread'] < -THRESHOLD), 'entry_signal'] = 'LONG_STRADDLE'
-
-# 4. DISPLAY RESULTS
-print("--- STRATEGY SIGNALS (DAY 1 ENTRIES) ---")
-# Filter to show only Day 1 rows for a cleaner view
-entries = merged_df[merged_df['cycle_day'] == 1]
-print(entries[['Date', 'vol_spread', 'entry_signal']].head(10))
-
-
-import pandas as pd
 import numpy as np
 from scipy.stats import norm
-
-# ── 1. LOAD SHEETS ─────────────────────────────────────────────────────────────
-delta_df = pd.read_excel('options_data_2025.xlsx', sheet_name='Delta_Trading')
-iv_df    = pd.read_excel('options_data_2025.xlsx', sheet_name='IV')
-
-delta_df['Date'] = pd.to_datetime(delta_df['Date'])
-iv_df['Date']    = pd.to_datetime(iv_df['Date'])
-
-# ── 2. MERGE SHEETS ────────────────────────────────────────────────────────────
-bs_df = pd.merge(
-    delta_df,
-    iv_df[['Date', 'IV_30D_Call(%)', 'IV_30D_Put(%)']],
-    on='Date',
-    how='inner'
-)
-
-print(f"✓ Merged rows : {len(bs_df)}")
-
-# ── 3. BLACK-SCHOLES DELTA FUNCTION ───────────────────────────────────────────
-def calculate_bs_deltas(row):
-    S          = row['Underlying (SPX Spot)']
-    K          = row['ATM Strike']
-    r          = row['RF_1M/100']
-    T          = row['DTE_F = FrontExp - Date'] / 365
-    sigma_call = row['IV_30D_Call(%)'] / 100
-    sigma_put  = row['IV_30D_Put(%)']  / 100
-
-    d1_call    = (np.log(S / K) + (r + 0.5 * sigma_call ** 2) * T) / (sigma_call * np.sqrt(T))
-    delta_call = norm.cdf(d1_call)
-
-    d1_put     = (np.log(S / K) + (r + 0.5 * sigma_put ** 2) * T) / (sigma_put * np.sqrt(T))
-    delta_put  = norm.cdf(d1_put) - 1
-
-    straddle_delta = delta_call + delta_put
-    return pd.Series([delta_call, delta_put, straddle_delta])
-
-# ── 4. APPLY BLACK-SCHOLES ────────────────────────────────────────────────────
-bs_df[['Call_Delta', 'Put_Delta', 'Straddle_Delta']] = bs_df.apply(calculate_bs_deltas, axis=1)
-
-# ── 5. COMPARE WITH EXCEL DELTAS ──────────────────────────────────────────────
-bs_df['Call_Delta_Diff']     = bs_df['Call_Delta']     - bs_df['Call Delta（Trading）']
-bs_df['Put_Delta_Diff']      = bs_df['Put_Delta']      - bs_df['Put Delta (Trading)']
-bs_df['Straddle_Delta_Diff'] = bs_df['Straddle_Delta'] - bs_df['Straddle Delta']
-
-# ── 6. PRINT RESULTS ──────────────────────────────────────────────────────────
-print("\n── BLACK-SCHOLES DELTA RESULTS ──")
-cols = ['Date', 'RF_1M/100', 'Call_Delta', 'Put_Delta', 'Straddle_Delta']
-print(bs_df[cols].head(10).to_string(index=False))
-
-print("\n── VERIFICATION vs EXCEL ──")
-verify_cols = ['Date', 'Call Delta（Trading）', 'Call_Delta', 'Call_Delta_Diff',
-                       'Put Delta (Trading)',   'Put_Delta',  'Put_Delta_Diff']
-print(bs_df[verify_cols].head(10).to_string(index=False))
-
-print("\n── RISK FREE RATE USED (Per Row) ──")
-print(bs_df[['Date', 'RF_1M/100']].describe())
-
-
-import pandas as pd
-import numpy as np
-from scipy.stats import norm
+import matplotlib.pyplot as plt
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SETTINGS
 # ══════════════════════════════════════════════════════════════════════════════
 SPAN         = 30
 CYCLE_LENGTH = 5
-UPPER_THRESH =  0.0279
-LOWER_THRESH = -0.0237
+TRANS_COST   = 0.001
 IV_COL       = 'IV_30D=(B2+C2)/2'
 STRADDLE_COL = '30D Constant-Maturity Straddle'
 
@@ -413,7 +64,8 @@ merged_df = pd.merge(
     straddle_df[['Date', STRADDLE_COL, 'PnL', 'Return']],
     on='Date', how='inner'
 )
-print(f"✓ Merged rows    : {len(merged_df)}")
+merged_df = merged_df.reset_index(drop=True)
+print(f"✓ Merged rows : {len(merged_df)}")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 4 — BLACK-SCHOLES DELTAS
@@ -429,7 +81,7 @@ def calculate_bs_deltas(row):
     d1_call    = (np.log(S / K) + (r + 0.5 * sigma_call ** 2) * T) / (sigma_call * np.sqrt(T))
     delta_call = norm.cdf(d1_call)
 
-    d1_put     = (np.log(S / K) + (r + 0.5 * sigma_put  ** 2) * T) / (sigma_put  * np.sqrt(T))
+    d1_put     = (np.log(S / K) + (r + 0.5 * sigma_put ** 2) * T) / (sigma_put * np.sqrt(T))
     delta_put  = norm.cdf(d1_put) - 1
 
     return pd.Series([delta_call, delta_put, delta_call + delta_put])
@@ -440,21 +92,35 @@ merged_df[['BS_Call_Delta', 'BS_Put_Delta', 'BS_Straddle_Delta']] = merged_df.ap
 print("✓ Black-Scholes deltas calculated")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 5 — VOL SPREAD + SIGNALS
+# STEP 5 — VOL SPREAD + DATA-DRIVEN THRESHOLDS
 # ══════════════════════════════════════════════════════════════════════════════
 merged_df['vol_spread'] = merged_df[IV_COL] - merged_df['forecast_vol']
+
+# ── DATA-DRIVEN THRESHOLDS (replaces hardcoded 0.0279 / -0.0237) ─────────────
+UPPER_THRESH = merged_df['vol_spread'].quantile(0.75)
+LOWER_THRESH = merged_df['vol_spread'].quantile(0.25)
+
+print(f"\n✓ Data-driven thresholds calculated from vol_spread distribution:")
+print(f"  Upper threshold (75th pct) : {UPPER_THRESH:.4f}")
+print(f"  Lower threshold (25th pct) : {LOWER_THRESH:.4f}")
+print(f"  Spread mean                : {merged_df['vol_spread'].mean():.4f}")
+print(f"  Spread std                 : {merged_df['vol_spread'].std():.4f}")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 6 — SIGNALS
+# ══════════════════════════════════════════════════════════════════════════════
 merged_df['cycle_day']    = (np.arange(len(merged_df)) % CYCLE_LENGTH) + 1
 merged_df['entry_signal'] = 'HOLD/NONE'
 
 day_1_mask = (merged_df['cycle_day'] == 1)
-merged_df.loc[day_1_mask & (merged_df['vol_spread'] >  UPPER_THRESH), 'entry_signal'] = 'LONG_STRADDLE'
-merged_df.loc[day_1_mask & (merged_df['vol_spread'] <  LOWER_THRESH), 'entry_signal'] = 'SHORT_STRADDLE'
+merged_df.loc[day_1_mask & (merged_df['vol_spread'] > UPPER_THRESH), 'entry_signal'] = 'SHORT_STRADDLE'
+merged_df.loc[day_1_mask & (merged_df['vol_spread'] < LOWER_THRESH), 'entry_signal'] = 'LONG_STRADDLE'
 
-print(f"✓ Signals generated")
+print(f"\n✓ Signals generated:")
 print(f"  {merged_df[day_1_mask]['entry_signal'].value_counts().to_dict()}")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 6 — DELTA HEDGING
+# STEP 7 — DELTA HEDGING
 # ══════════════════════════════════════════════════════════════════════════════
 merged_df['Straddle_Delta_Trading'] = (
     merged_df['Call Delta（Trading）'] + merged_df['Put Delta (Trading)']
@@ -462,9 +128,9 @@ merged_df['Straddle_Delta_Trading'] = (
 merged_df['active_pos'] = merged_df['entry_signal'].replace('HOLD/NONE', np.nan).ffill()
 
 def calculate_share_hedge(row):
-    if row['cycle_day'] == 5:                 return 0
-    if row['active_pos'] == 'LONG_STRADDLE':  return -row['Straddle_Delta_Trading']
-    if row['active_pos'] == 'SHORT_STRADDLE': return  row['Straddle_Delta_Trading']
+    if row['cycle_day'] == 5:                  return 0
+    if row['active_pos'] == 'LONG_STRADDLE':   return -row['Straddle_Delta_Trading']
+    if row['active_pos'] == 'SHORT_STRADDLE':  return  row['Straddle_Delta_Trading']
     return 0
 
 merged_df['share_hedge_qty']   = merged_df.apply(calculate_share_hedge, axis=1)
@@ -472,12 +138,10 @@ merged_df['daily_hedge_trade'] = merged_df['share_hedge_qty'].diff().fillna(0)
 merged_df.loc[merged_df['cycle_day'] == 1, 'daily_hedge_trade'] = merged_df['share_hedge_qty']
 print("✓ Delta hedging calculated")
 
-
-# ── P&L CALCULATION (FIXED) ───────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 8 — BACKTEST P&L
+# ══════════════════════════════════════════════════════════════════════════════
 results = []
-
-# Reset index so positions match 0,1,2...249
-merged_df = merged_df.reset_index(drop=True)
 
 for i in range(len(merged_df)):
     row    = merged_df.iloc[i]
@@ -490,9 +154,9 @@ for i in range(len(merged_df)):
     if exit_idx >= len(merged_df):
         continue
 
-    exit_row     = merged_df.iloc[exit_idx]
-    entry_price  = row[STRADDLE_COL]
-    exit_price   = exit_row[STRADDLE_COL]
+    exit_row    = merged_df.iloc[exit_idx]
+    entry_price = row[STRADDLE_COL]
+    exit_price  = exit_row[STRADDLE_COL]
 
     # Straddle P&L
     if signal == 'SHORT_STRADDLE':
@@ -526,15 +190,16 @@ for i in range(len(merged_df)):
 
 results_df = pd.DataFrame(results)
 results_df['Cumulative PnL'] = results_df['Net PnL'].cumsum()
+print(f"✓ Trades captured : {len(results_df)}")
 
-# ── PERFORMANCE METRICS ───────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 9 — PERFORMANCE METRICS
+# ══════════════════════════════════════════════════════════════════════════════
 wins     = results_df[results_df['Net PnL'] > 0].shape[0]
 total    = results_df.shape[0]
 win_rate = wins / total if total > 0 else 0
 sharpe   = results_df['Net PnL'].mean() / results_df['Net PnL'].std() * np.sqrt(52)
 max_dd   = (results_df['Cumulative PnL'] - results_df['Cumulative PnL'].cummax()).min()
-
-print(f"✓ Trades captured : {total}")
 
 print("\n══ FULL BACKTEST RESULTS ══")
 print(results_df.to_string(index=False))
@@ -547,17 +212,14 @@ print(f"  Max Drawdown   : ${max_dd:.2f}")
 print(f"  Final Cum. PnL : ${results_df['Cumulative PnL'].iloc[-1]:.2f}")
 
 print("\n══ SIGNAL BREAKDOWN ══")
-print(results_df.groupby('Signal')['Net PnL'].agg(['sum','mean','count']).to_string())
+print(results_df.groupby('Signal')['Net PnL'].agg(['sum', 'mean', 'count']).to_string())
 
-
-import numpy as np
-import matplotlib.pyplot as plt
-
- # ── CREATE BENCHMARK CUMULATIVE COLUMNS ───────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 10 — BENCHMARK COMPARISON + PLOT
+# ══════════════════════════════════════════════════════════════════════════════
 merged_df['cum_always_long']  = merged_df['PnL'].cumsum()
 merged_df['cum_always_short'] = (-merged_df['PnL']).cumsum()
 merged_df['cum_buy_hold']     = merged_df['Underlying (SPX Spot)'].diff().fillna(0).cumsum()
-
 merged_df['cum_strategy_pnl'] = (
     merged_df['Date']
     .map(results_df.set_index('Entry Date')['Cumulative PnL'])
@@ -565,46 +227,36 @@ merged_df['cum_strategy_pnl'] = (
     .fillna(0)
 )
 
-# ── SHARPE RATIO FUNCTION ─────────────────────────────────────────────────────
 def calc_sharpe(pnl_series, periods=252):
-    mean = pnl_series.mean()
-    std  = pnl_series.std()
+    mean, std = pnl_series.mean(), pnl_series.std()
     return (mean / std) * np.sqrt(periods) if std != 0 else 0
 
-# ── MAX DRAWDOWN FUNCTION ─────────────────────────────────────────────────────
 def calc_max_drawdown(cum_series):
     return (cum_series - cum_series.cummax()).min()
 
-# ── WIN RATE FUNCTION ─────────────────────────────────────────────────────────
 def calc_win_rate(pnl_series):
     wins  = (pnl_series > 0).sum()
     total = (pnl_series != 0).sum()
     return wins / total if total != 0 else 0
 
-# ── RETURN % FUNCTION ─────────────────────────────────────────────────────────
 def calc_return_pct(cum_pnl, start_price):
     return (cum_pnl / start_price) * 100
 
-# ── STARTING REFERENCE PRICE ──────────────────────────────────────────────────
-start_price = merged_df['Underlying (SPX Spot)'].iloc[0]
-
-# ── P&L SERIES ────────────────────────────────────────────────────────────────
+start_price         = merged_df['Underlying (SPX Spot)'].iloc[0]
 strategy_pnl_series = results_df['Net PnL']
 always_long_series  = merged_df['PnL']
 always_short_series = -merged_df['PnL']
 buy_hold_series     = merged_df['Underlying (SPX Spot)'].diff().fillna(0)
 
-# ── FINAL CUMULATIVE P&L ──────────────────────────────────────────────────────
-final_strategy  = results_df['Cumulative PnL'].iloc[-1]
-final_long      = merged_df['cum_always_long'].iloc[-1]
-final_short     = merged_df['cum_always_short'].iloc[-1]
-final_buy_hold  = merged_df['cum_buy_hold'].iloc[-1]
+final_strategy = results_df['Cumulative PnL'].iloc[-1]
+final_long     = merged_df['cum_always_long'].iloc[-1]
+final_short    = merged_df['cum_always_short'].iloc[-1]
+final_buy_hold = merged_df['cum_buy_hold'].iloc[-1]
 
-# ── CALCULATE ALL METRICS ─────────────────────────────────────────────────────
 metrics = {
     'EWMA Strategy' : {
         'Final PnL'    : final_strategy,
-        'Return %'     : calc_return_pct(final_strategy,  start_price),
+        'Return %'     : calc_return_pct(final_strategy, start_price),
         'Sharpe'       : calc_sharpe(strategy_pnl_series, periods=52),
         'Max Drawdown' : calc_max_drawdown(results_df['Cumulative PnL']),
         'DD %'         : calc_return_pct(calc_max_drawdown(results_df['Cumulative PnL']), start_price),
@@ -612,35 +264,33 @@ metrics = {
     },
     'Always Long' : {
         'Final PnL'    : final_long,
-        'Return %'     : calc_return_pct(final_long,       start_price),
-        'Sharpe'       : calc_sharpe(always_long_series,   periods=252),
+        'Return %'     : calc_return_pct(final_long, start_price),
+        'Sharpe'       : calc_sharpe(always_long_series, periods=252),
         'Max Drawdown' : calc_max_drawdown(merged_df['cum_always_long']),
         'DD %'         : calc_return_pct(calc_max_drawdown(merged_df['cum_always_long']), start_price),
         'Win Rate'     : calc_win_rate(always_long_series)
     },
     'Always Short' : {
         'Final PnL'    : final_short,
-        'Return %'     : calc_return_pct(final_short,      start_price),
-        'Sharpe'       : calc_sharpe(always_short_series,  periods=252),
+        'Return %'     : calc_return_pct(final_short, start_price),
+        'Sharpe'       : calc_sharpe(always_short_series, periods=252),
         'Max Drawdown' : calc_max_drawdown(merged_df['cum_always_short']),
         'DD %'         : calc_return_pct(calc_max_drawdown(merged_df['cum_always_short']), start_price),
         'Win Rate'     : calc_win_rate(always_short_series)
     },
     'Buy & Hold' : {
         'Final PnL'    : final_buy_hold,
-        'Return %'     : calc_return_pct(final_buy_hold,   start_price),
-        'Sharpe'       : calc_sharpe(buy_hold_series,      periods=252),
+        'Return %'     : calc_return_pct(final_buy_hold, start_price),
+        'Sharpe'       : calc_sharpe(buy_hold_series, periods=252),
         'Max Drawdown' : calc_max_drawdown(merged_df['cum_buy_hold']),
         'DD %'         : calc_return_pct(calc_max_drawdown(merged_df['cum_buy_hold']), start_price),
         'Win Rate'     : calc_win_rate(buy_hold_series)
     }
 }
 
-# ── PRINT FULL COMPARISON ─────────────────────────────────────────────────────
-print("══ FULL BENCHMARK COMPARISON ══")
+print("\n══ FULL BENCHMARK COMPARISON ══")
 print(f"{'Strategy':<22} {'Final PnL':>10} {'Return%':>9} {'Sharpe':>8} {'Max DD':>10} {'DD%':>7} {'Win Rate':>10}")
 print("─" * 80)
-
 for name, m in metrics.items():
     print(
         f"{name:<22}"
@@ -654,24 +304,20 @@ for name, m in metrics.items():
 
 # ── PLOT ──────────────────────────────────────────────────────────────────────
 plt.figure(figsize=(12, 6))
-
 plt.plot(merged_df['Date'], merged_df['cum_strategy_pnl'],
          label=f"EWMA Strategy  | Sharpe: {metrics['EWMA Strategy']['Sharpe']:.2f} | Return: {metrics['EWMA Strategy']['Return %']:.2f}%",
          linewidth=2)
-
 plt.plot(merged_df['Date'], merged_df['cum_always_long'],
          label=f"Always Long    | Sharpe: {metrics['Always Long']['Sharpe']:.2f} | Return: {metrics['Always Long']['Return %']:.2f}%",
          linestyle='--')
-
 plt.plot(merged_df['Date'], merged_df['cum_always_short'],
          label=f"Always Short   | Sharpe: {metrics['Always Short']['Sharpe']:.2f} | Return: {metrics['Always Short']['Return %']:.2f}%",
          linestyle='--')
-
 plt.plot(merged_df['Date'], merged_df['cum_buy_hold'],
          label=f"Buy & Hold     | Sharpe: {metrics['Buy & Hold']['Sharpe']:.2f} | Return: {metrics['Buy & Hold']['Return %']:.2f}%",
          linestyle=':')
 
-plt.title('EWMA Strategy vs Benchmarks — Risk Adjusted')
+plt.title(f'EWMA Strategy vs Benchmarks — Data-Driven Thresholds (Q25={LOWER_THRESH:.4f}, Q75={UPPER_THRESH:.4f})')
 plt.xlabel('Date')
 plt.ylabel('Cumulative P&L ($)')
 plt.legend(fontsize=9)
