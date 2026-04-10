@@ -32,18 +32,32 @@ straddle_df['Date'] = pd.to_datetime(straddle_df['Date'])
 print("✓ Data loaded")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 2 — EWMA VOLATILITY
+# ══════════════════════════════════════════════════════════════════════════════
+# STEP 2 — EWMA VOLATILITY (30-DAY FORECAST)
 # ══════════════════════════════════════════════════════════════════════════════
 def get_ewma_forecast(df, col_name, span=30):
-    TRADING_DAYS   = 252
-    ROLLING_WINDOW = 30
+    """
+    Calculates the EWMA annualized volatility.
+    In the EWMA model, the n-day forecast is equal to the 1-day forecast.
+    """
+    TRADING_DAYS = 252
+    
+    # 1. Square the log returns to get daily variance components
     sq_returns = df[col_name] ** 2
-    daily_vol  = np.sqrt(sq_returns.ewm(span=span, adjust=False).mean())
-    annual_vol = daily_vol * np.sqrt(TRADING_DAYS)
-    return annual_vol.rolling(window=ROLLING_WINDOW).mean()
+    
+    # 2. Apply the Exponential Weighted Moving Average to the variance
+    daily_var_ewma = sq_returns.ewm(span=span, adjust=False).mean()
+    
+    # 3. Annualize the volatility: Square root of (Daily Variance * 252)
+    annual_vol = np.sqrt(daily_var_ewma * TRADING_DAYS)
+    
+    return annual_vol
 
+# Apply the forecast to your dataframe
 df['forecast_vol'] = get_ewma_forecast(df, col_name='log_return', span=SPAN)
-print(f"✓ EWMA calculated | Lambda (λ) : {1 - (2 / (SPAN + 1)):.4f}")
+
+print(f"✓ EWMA 30-Day Forecast calculated")
+print(f"  Lambda (λ) used: {1 - (2 / (SPAN + 1)):.4f}")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 3 — MERGE ALL DATA
