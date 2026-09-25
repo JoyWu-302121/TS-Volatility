@@ -56,3 +56,4 @@ The legacy filenames beginning with `SPY_` contain SPX index levels, not the SPY
 - `data/processed/canonical/`: versioned, model-ready inputs for the canonical notebook.
 - `Literature_Review/`: background research and references.
 - `requirements.txt`: Python dependencies for the canonical workflow.
+- `extensions/spx_1min_volatility/`: isolated SPX one-minute realized-volatility reconstruction and forecasting project.
