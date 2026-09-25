@@ -47,3 +47,14 @@ python extensions/scripts/evaluate_forecasts.py
 The initial `756`-day rolling window and five-session parameter-refit cadence are provisional. Validation should compare `504`, `756`, `1008`, and `expanding` windows using QLIKE as the primary criterion before one specification is locked. The final-OOS option in `run_baseline_models.py` intentionally raises an error until that choice is documented.
 
 Every script validates that feature/model information ends no later than the forecast-origin date and that `forecast_origin_date < target_date`. Metrics include QLIKE, MAE, RMSE, and pairwise QLIKE Diebold–Mariano tests with a five-lag Bartlett HAC estimator.
+
+## Results review
+
+`code/02_validation_model_review.ipynb` reads the saved Validation artifacts and displays the figures without retraining the models. The corresponding reproducible commands are:
+
+```bash
+python extensions/scripts/plot_validation_results.py
+python extensions/scripts/write_validation_report.py
+```
+
+The generated PNG figures are stored in `figures/`; the concise data-derived summary is `reports/validation_summary.md`. Both are Validation-only outputs. They use annualized volatility only for readability; loss calculations remain in daily variance units.
