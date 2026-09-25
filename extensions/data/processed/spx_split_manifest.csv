@@ -1,0 +1,4 @@
+split,n_forecasts,first_target_date,last_target_date,first_origin_date,last_origin_date
+final_oos,674,2024-01-02,2026-09-18,2023-12-29,2026-09-17
+train,2974,2010-02-04,2021-12-31,2010-02-03,2021-12-30
+validation,497,2022-01-03,2023-12-29,2021-12-31,2023-12-28
